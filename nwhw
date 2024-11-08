@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.43.0/min/vs/loader.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: #1e1e1e;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    .titlebar {
+      height: 32px;
+      background: #252526;
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      -webkit-app-region: drag;
+      user-select: none;
+    }
+
+    .titlebar-title {
+      color: #808080;
+      font-size: 12px;
+      margin-left: 8px;
+    }
+
+    .main-container {
+      display: flex;
+      height: calc(100vh - 32px);
+      box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .sidebar {
+      width: 48px;
+      background: #252526;
+      border-right: 1px solid #404040;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sidebar-section {
+      padding: 8px 0;
+      border-bottom: 1px solid #404040;
+    }
+
+    .sidebar-button {
+      width: 100%;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #808080;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      transition: color 0.2s ease;
+    }
+
+    .sidebar-button:hover {
+      color: #fff;
+    }
+
+    .sidebar-button.active {
+      color: #fff;
+      border-left: 2px solid #fff;
+    }
+
+    .editor-container {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      position: relative;
+    }
+
+    .header {
+      background: #252526;
+      padding: 8px 16px;
+      color: #fff;
+      font-size: 16px;
+      font-weight: 500;
+      border-bottom: 1px solid #404040;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .tab-container {
+      display: flex;
+      background: #252526;
+      border-bottom: 1px solid #404040;
+      padding: 0 8px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .tab-container::-webkit-scrollbar {
+      display: none;
+    }
+
+    .tab {
+      padding: 8px 16px;
+      color: #808080;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      border-right: 1px solid #404040;
+      transition: all 0.2s ease;
+      user-select: none;
+      position: relative;
+    }
+
+    .tab.active {
+      color: #fff;
+      background: #1e1e1e;
+    }
+
+    .tab:hover {
+      background: #2d2d2d;
+    }
+
+    .tab-close {
+      margin-left: 8px;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .tab:hover .tab-close {
+      opacity: 1;
+    }
+
+    .new-tab {
+      padding: 8px 12px;
+      color: #808080;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      transition: color 0.2s;
+    }
+
+    .new-tab:hover {
+      color: #fff;
+    }
+
+    #monaco-container {
+      flex: 1;
+      position: relative;
+    }
+
+    .action-buttons {
+      position: absolute;
+      bottom: 24px;
+      right: 24px;
+      display: flex;
+      gap: 12px;
+      z-index: 1000;
+    }
+
+    .fab {
+      width: 40px;
+      height: 40px;
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: white;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      backdrop-filter: blur(5px);
+    }
+
+    .fab:hover {
+      transform: translateY(-2px);
+      background: rgba(255, 255, 255, 0.1);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    .terminal {
+      background: #1e1e1e;
+      padding: 16px;
+      font-family: 'Consolas', monospace;
+      height: 150px;
+      overflow-y: auto;
+      border-top: 1px solid #404040;
+    }
+
+    .terminal::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .terminal::-webkit-scrollbar-track {
+      background: #1e1e1e;
+    }
+
+    .terminal::-webkit-scrollbar-thumb {
+      background: #404040;
+      border-radius: 4px;
+    }
+
+    .terminal-message {
+      color: #808080;
+      font-size: 13px;
+      padding: 4px 0;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .terminal div.error {
+      color: #ff8a80;
+    }
+
+    .terminal div.success {
+      color: #81c784;
+    }
+
+    .terminal div.warning {
+      color: #ffd700;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(5px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <div class="titlebar">
+    <i class="fas fa-cube" style="color: #808080;"></i>
+    <span class="titlebar-title">Voxel.dev</span>
+  </div>
+  <div class="main-container">
+    <div class="sidebar">
+      <div class="sidebar-section">
+        <button class="sidebar-button active"><i class="fas fa-folder"></i></button>
+        <button class="sidebar-button"><i class="fas fa-magnifying-glass"></i></button>
+        <button class="sidebar-button"><i class="fas fa-code-branch"></i></button>
+      </div>
+      <div class="sidebar-section">
+        <button class="sidebar-button"><i class="fas fa-gear"></i></button>
+      </div>
+    </div>
+    <div class="editor-container">
+      <div class="tab-container" id="tabContainer">
+        <div class="tab active" data-tab="1">
+          <i class="fas fa-file-code"></i>
+          player.lua
+          <span class="tab-close">×</span>
+        </div>
+        <div class="tab" data-tab="2">
+          <i class="fas fa-file-code"></i>
+          game.lua
+          <span class="tab-close">×</span>
+        </div>
+        <div class="new-tab" id="newTabBtn">
+          <i class="fas fa-plus"></i>
+        </div>
+      </div>
+      <div id="monaco-container"></div>
+      <div class="action-buttons">
+        <button class="fab execute" onclick="executeCode()" title="Execute">
+          <i class="fas fa-play"></i>
+        </button>
+        <button class="fab inject" onclick="injectCode()" title="Inject">
+          <i class="fas fa-syringe"></i>
+        </button>
+        <button class="fab clear" onclick="clearEditor()" title="Clear">
+          <i class="fas fa-eraser"></i>
+        </button>
+      </div>
+      <div class="terminal" id="terminal"></div>
+    </div>
+  </div>
+
+  <script>
+    let editor;
+    let isInjected = false;
+    let tabCounter = 2;
+    let currentTab = 1;
+    let tabContents = new Map([
+      [1, '-- Player script\n\nlocal Player = {}\n\nfunction Player:new()\n    return setmetatable({}, self)\nend\n\nreturn Player'],
+      [2, '-- Game script\n\nlocal Game = {}\n\nfunction Game:init()\n    self.players = {}\nend\n\nreturn Game']
+    ]);
+
+    function log(message, type = '') {
+      const terminal = document.getElementById('terminal');
+      const logDiv = document.createElement('div');
+      logDiv.className = `terminal-message ${type}`;
+      logDiv.textContent = message;
+      terminal.appendChild(logDiv);
+      terminal.scrollTop = terminal.scrollHeight;
+    }
+
+    function switchTab(tabId) {
+      if (editor) {
+        tabContents.set(currentTab, editor.getValue());
+      }
+
+      document.querySelectorAll('.tab').forEach(tab => {
+        tab.classList.remove('active');
+      });
+      document.querySelector(`[data-tab="${tabId}"]`).classList.add('active');
+
+      currentTab = tabId;
+      if (tabContents.has(tabId)) {
+        editor.setValue(tabContents.get(tabId));
+      }
+    }
+
+    function createNewTab() {
+      tabCounter++;
+      const newTab = document.createElement('div');
+      newTab.className = 'tab';
+      newTab.setAttribute('data-tab', tabCounter);
+      newTab.innerHTML = `
+        <i class="fas fa-file-code"></i>
+        script-${tabCounter}.lua
+        <span class="tab-close">×</span>
+      `;
+      document.querySelector('.new-tab').insertAdjacentElement('beforebegin', newTab);
+      tabContents.set(tabCounter, '-- New script\n');
+      switchTab(tabCounter);
+    }
+
+    function executeCode() {
+      if (!isInjected) {
+        log('Error: Not injected. Please inject first.', 'error');
+        return;
+      }
+      if (editor) {
+        const code = editor.getValue();
+        log('Executing code...', 'success');
+      }
+    }
+
+    function injectCode() {
+      if (isInjected) {
+        log('Already injected!', 'error');
+        return;
+      }
+      isInjected = true;
+      log('Successfully injected!', 'success');
+    }
+
+    function clearEditor() {
+      if (editor) {
+        editor.setValue('');
+        tabContents.set(currentTab, '');
+        log('Editor cleared', 'warning');
+      }
+    }
+
+    require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.43.0/min/vs' }});
+
+    require(['vs/editor/editor.main'], function() {
+      editor = monaco.editor.create(document.getElementById('monaco-container'), {
+        value: tabContents.get(1),
+        language: 'lua',
+        theme: 'vs-dark',
+        automaticLayout: true,
+        fontSize: 14,
+        minimap: { enabled: true }
+      });
+
+      // Log startup message
+      const now = new Date().toLocaleTimeString();
+      log(`${now} [debug]: voxel updated.`);
+
+      document.getElementById('newTabBtn').addEventListener('click', createNewTab);
+
+      document.getElementById('tabContainer').addEventListener('click', function(e) {
+        const tab = e.target.closest('.tab');
+        const closeButton = e.target.closest('.tab-close');
+        
+        if (closeButton && tab) {
+          const tabId = parseInt(tab.getAttribute('data-tab'));
+          if (document.querySelectorAll('.tab').length > 1) {
+            tab.remove();
+            tabContents.delete(tabId);
+            
+            if (currentTab === tabId) {
+              const firstTab = document.querySelector('.tab');
+              const firstTabId = parseInt(firstTab.getAttribute('data-tab'));
+              switchTab(firstTabId);
+            }
+          }
+          e.stopPropagation();
+        } else if (tab) {
+          const tabId = parseInt(tab.getAttribute('data-tab'));
+          switchTab(tabId);
+        }
+      });
+
+      document.querySelectorAll('.sidebar-button').forEach(button => {
+        button.addEventListener('click', function() {
+          document.querySelectorAll('.sidebar-button').forEach(btn => {
+            btn.classList.remove('active');
+          });
+          this.classList.add('active');
+        });
+      });
+    });
+  </script>
+</body>
+</html>
